@@ -5,8 +5,10 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-security")
     implementation(libs.uuid.creator)
     implementation(libs.jjwt.api)
+    implementation("org.springframework.boot:spring-boot-starter-validation")
 
     runtimeOnly("org.postgresql:postgresql")
+    runtimeOnly("org.flywaydb:flyway-database-postgresql")
     runtimeOnly(libs.jjwt.impl)
     runtimeOnly(libs.jjwt.jackson)
 }
