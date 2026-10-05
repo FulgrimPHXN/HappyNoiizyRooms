@@ -5,6 +5,8 @@ import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.diceordieass.users.security.UserRole;
+import org.hibernate.annotations.CollectionId;
 
 import java.util.Objects;
 import java.util.UUID;
@@ -31,6 +33,10 @@ public class User {
     @Version
     private Long version;
 
+    @Column(name = "user_role")
+    @Enumerated(EnumType.STRING)
+    private UserRole role;
+
     @Column(name = "user_name", unique = true)
     private String userName;
 
@@ -50,6 +56,7 @@ public class User {
         this.id = UuidCreator.getTimeOrderedEpoch();//Статический метод из библиотеки uuid-creator, генерирует новый UUID
         this.userName = Objects.requireNonNull(userName, "userName must not be null"); //Проверяет, что переданный параметр userName не null. Если он null — тут же бросает NullPointerException
         this.passwordHash = Objects.requireNonNull(passwordHash, "passwordHash must not be null");
+        this.role = UserRole.ROLE_USER;
     }
 
     @Override

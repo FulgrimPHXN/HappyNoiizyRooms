@@ -2,9 +2,10 @@ package org.diceordieass.users.controller;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.diceordieass.users.dto.AuthResponse;
 import org.diceordieass.users.dto.UserDto;
 import org.diceordieass.users.dto.UserResponse;
-import org.diceordieass.users.service.UserService;
+import org.diceordieass.users.service.AuthService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -14,12 +15,12 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequiredArgsConstructor
-@RequestMapping("/api/user")//Связывает HTTP-запрос с классом по URL-пути. Задаёт базовый префикс пути для всех методов внутри этого контроллера.
-public class UserController {
+@RequestMapping("/api/auth")//Связывает HTTP-запрос с классом по URL-пути. Задаёт базовый префикс пути для всех методов внутри этого контроллера.
+public class AuthController {
 
-    private final UserService userService;
+    private final AuthService authService;
 
-    @PostMapping
+    @PostMapping("/register")
     /*
     ResponseEntity<T> — это Java-представление всего HTTP-ответа целиком: код статуса, заголовки и тело — одним объектом.
     Не просто данные, которые нужно вернуть, а полное описание того, что уйдёт клиенту по протоколу HTTP.
@@ -32,6 +33,12 @@ public class UserController {
          развешанные на полях UserDto, и сверяет их с реальными значениями, которые пришли в теле конкретного HTTP-запроса.
          Если хоть одно условие нарушено — бросается MethodArgumentNotValidException (тот самый, что ловит ваш handleValidation).
          */
-        return ResponseEntity.status(HttpStatus.CREATED).body(UserResponse.from(userService.createUser(userDto)));
+        return ResponseEntity.status(HttpStatus.CREATED).body(UserResponse.from(authService.createUser(userDto)));
+    }
+
+    @PostMapping("/login")
+    public ResponseEntity<AuthResponse> login(@Valid @RequestBody UserDto userDto) {
+        AuthService.LoginResult result = authService.login(userDto);
+        return ResponseEntity.ok(AuthResponse.from(result.user(), result.token()));
     }
 }
