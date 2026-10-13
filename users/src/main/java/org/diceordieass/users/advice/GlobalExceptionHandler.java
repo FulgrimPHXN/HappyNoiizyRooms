@@ -1,5 +1,6 @@
 package org.diceordieass.users.advice;
 
+import org.diceordieass.users.exception.IncorrectPasswordException;
 import org.diceordieass.users.exception.UserAlreadyExistsException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
@@ -54,6 +55,13 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(AuthenticationException.class)
     public ProblemDetail handleAuthenticateException(AuthenticationException e) {
         return ProblemDetail.forStatusAndDetail(HttpStatus.UNAUTHORIZED, "Неверный логин или пароль");
+    }
+
+    @ExceptionHandler(IncorrectPasswordException.class)
+    public ProblemDetail handleIncorrectPasswordException(IncorrectPasswordException e) {
+        ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, "Ошибка валидации");
+        problemDetail.setProperty("errors", Map.of("oldPassword", e.getMessage()));
+        return problemDetail;
     }
     /*
     С такими валидаторами ошибка будет прилетать такого вида:

@@ -6,7 +6,6 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.diceordieass.users.security.UserRole;
-import org.hibernate.annotations.CollectionId;
 
 import java.util.Objects;
 import java.util.UUID;
@@ -57,6 +56,14 @@ public class User {
         this.userName = Objects.requireNonNull(userName, "userName must not be null"); //Проверяет, что переданный параметр userName не null. Если он null — тут же бросает NullPointerException
         this.passwordHash = Objects.requireNonNull(passwordHash, "passwordHash must not be null");
         this.role = UserRole.ROLE_USER;
+    }
+
+    public void changePassword(String newPasswordHash) {
+        this.passwordHash = Objects.requireNonNull(newPasswordHash, "newPasswordHash must not be null");
+    }
+
+    public void rename(String newUserName) {
+        this.userName = Objects.requireNonNull(newUserName, "newUserName must not be null");
     }
 
     @Override
