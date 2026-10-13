@@ -13,7 +13,6 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.Objects;
 import java.util.Optional;
 
 @Service
@@ -22,6 +21,7 @@ public class UserService {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final RefreshTokenService refreshTokenService;
 
     @Transactional
     public void changePassword(Authentication authentication , ChangeUserPasswordRequest request) {
@@ -34,6 +34,7 @@ public class UserService {
                         u -> u.changePassword(passwordEncoder.encode(request.newPassword())),
                         () -> {throw new IncorrectPasswordException("Пароли не совпадают");}
                 );
+        refreshTokenService.revokeAllForUser(user.getId());
     }
 
     @Transactional

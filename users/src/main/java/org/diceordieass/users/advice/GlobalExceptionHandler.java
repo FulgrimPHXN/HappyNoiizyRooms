@@ -1,6 +1,7 @@
 package org.diceordieass.users.advice;
 
 import org.diceordieass.users.exception.IncorrectPasswordException;
+import org.diceordieass.users.exception.InvalidRefreshTokenException;
 import org.diceordieass.users.exception.UserAlreadyExistsException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
@@ -62,6 +63,11 @@ public class GlobalExceptionHandler {
         ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, "Ошибка валидации");
         problemDetail.setProperty("errors", Map.of("oldPassword", e.getMessage()));
         return problemDetail;
+    }
+
+    @ExceptionHandler(InvalidRefreshTokenException.class)
+    public ProblemDetail handleInvalidRefreshTokenException(InvalidRefreshTokenException e) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, "Неверный рефреш токен");
     }
     /*
     С такими валидаторами ошибка будет прилетать такого вида:
