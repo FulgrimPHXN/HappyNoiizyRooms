@@ -63,6 +63,9 @@ public class SecurityConfig {
                         //это их credential, а не access-JWT в заголовке (которого на момент вызова refresh уже может не быть валидным)
                         .requestMatchers(HttpMethod.POST, "/api/auth/refresh").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/auth/logout").permitAll()
+                        //метрики/health открыты без JWT ради удобства локальной разработки (localhost не торчит
+                        //наружу) — на реальном проде это обычно прячут за отдельным management-портом/приватной сетью
+                        .requestMatchers("/actuator/**").permitAll()
                         .anyRequest().authenticated())
                 //Вставляет твой JwtAuthenticationFilter в цепочку перед стандартным (из коробки Spring Security) UsernamePasswordAuthenticationFilter.
                 // Именно этот фильтр читает заголовок Authorization, проверяет токен через JwtService и кладёт Authentication в SecurityContextHolder,

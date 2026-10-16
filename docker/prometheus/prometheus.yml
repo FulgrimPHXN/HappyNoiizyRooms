@@ -1,0 +1,26 @@
+# Глобальные настройки — применяются ко всем job'ам ниже, если у job'а нет своих.
+global:
+  # Как часто Prometheus сам ходит и забирает (scrape) метрики у целей из scrape_configs.
+  # 15s — стандартная рекомендация самого Prometheus: достаточно часто для графиков,
+  # но не настолько, чтобы заметно грузить опрашиваемый сервис.
+  scrape_interval: 15s
+
+scrape_configs:
+  # job_name — просто метка в самом Prometheus (появится как значение label `job` у всех
+  # метрик этой цели) — через неё в Grafana фильтруют "метрики именно этого сервиса".
+  - job_name: users
+
+    # Эндпоинт, по которому Prometheus ожидает увидеть метрики в своём текстовом формате.
+    # По умолчанию Prometheus ходит на "/metrics" — у Spring Boot Actuator путь другой,
+    # поэтому явно переопределяем.
+    metrics_path: /actuator/prometheus
+
+    # Список адресов, которые нужно опрашивать для этого job'а.
+    static_configs:
+      - targets:
+          # ":users" запущен не в контейнере (это обычный `gradlew bootRun` на хосте), а
+          # Prometheus живёт внутри docker-сети — значит "localhost" тут означало бы
+          # "сам контейнер Prometheus", а не хост-машину. "host.docker.internal" — особое
+          # имя, которое Docker резолвит в адрес хоста; на Linux оно не работает само по
+          # себе и требует явной записи extra_hosts в docker-compose.yml (см. там).
+          - host.docker.internal:8083
