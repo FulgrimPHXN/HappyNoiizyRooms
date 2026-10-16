@@ -59,6 +59,10 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.POST, "/api/auth/register").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/auth/login").permitAll()
+                        //refresh и logout проверяют право действовать сами, по raw refresh-токену в теле запроса —
+                        //это их credential, а не access-JWT в заголовке (которого на момент вызова refresh уже может не быть валидным)
+                        .requestMatchers(HttpMethod.POST, "/api/auth/refresh").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/auth/logout").permitAll()
                         .anyRequest().authenticated())
                 //Вставляет твой JwtAuthenticationFilter в цепочку перед стандартным (из коробки Spring Security) UsernamePasswordAuthenticationFilter.
                 // Именно этот фильтр читает заголовок Authorization, проверяет токен через JwtService и кладёт Authentication в SecurityContextHolder,

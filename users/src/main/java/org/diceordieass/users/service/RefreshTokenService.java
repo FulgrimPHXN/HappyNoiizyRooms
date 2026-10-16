@@ -37,9 +37,11 @@ public class RefreshTokenService {
                 .ifPresent(RefreshToken::revoke);
     }
 
-    //метод по замене старых refresh токенов на новые
+    //метод отзыва старого refresh токена с подтверждением его владельца
+    //создание нового токена сюда больше не входит: этому методу для подтверждения владельца
+    //нужен только userId, а чем дальше распорядится вызывающий код (новый access + новый refresh) — не его забота
     @Transactional
-    public String rotate(String rawOldToken) {
+    public UUID rotate(String rawOldToken) {
         //хеш refresh токена клиента хранится в бд, мы сравниваем его с его же сырым токеном
         RefreshToken token = refreshTokenRepository.findByTokenHash(hash(rawOldToken))
                 .orElseThrow(() ->  new InvalidRefreshTokenException("Invalid Refresh Token"));
@@ -56,8 +58,9 @@ public class RefreshTokenService {
         }
         //старый токен протухает
         token.revoke();
-        //создается новый токен пользователя
-        return createToken(token.getUserId());
+        //отдаём наружу владельца токена — вызывающий код сам решает, что с этим делать
+        //(новый access-JWT нужен username, новый refresh — отдельный вызов createToken)
+        return token.getUserId();
     }
 
     public String createToken(UUID userId) {

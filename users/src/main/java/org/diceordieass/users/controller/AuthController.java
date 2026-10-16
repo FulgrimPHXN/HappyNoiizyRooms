@@ -3,6 +3,7 @@ package org.diceordieass.users.controller;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.diceordieass.users.dto.AuthResponse;
+import org.diceordieass.users.dto.RefreshTokenDto;
 import org.diceordieass.users.dto.UserDto;
 import org.diceordieass.users.dto.UserResponse;
 import org.diceordieass.users.service.AuthService;
@@ -39,6 +40,23 @@ public class AuthController {
     @PostMapping("/login")
     public ResponseEntity<AuthResponse> login(@Valid @RequestBody UserDto userDto) {
         AuthService.LoginResult result = authService.login(userDto);
-        return ResponseEntity.ok(AuthResponse.from(result.user(), result.token()));
+        return ResponseEntity.ok(AuthResponse.from(result.user(), result.token(), result.refreshToken()));
+    }
+
+    @PostMapping("/refresh")
+    public ResponseEntity<AuthResponse> refresh(@Valid @RequestBody RefreshTokenDto dto) {
+        AuthService.LoginResult result = authService.refresh(dto.refreshToken());
+        return ResponseEntity.ok(AuthResponse.from(result.user(), result.token(), result.refreshToken()));
+    }
+
+    @PostMapping("/logout")
+    /*
+    логаут не возвращает тело — клиенту нечего сообщать сверх самого факта успеха,
+    поэтому ResponseEntity<Void>, а не какой-то DTO с пустыми полями
+     */
+    public ResponseEntity<Void> logout(@Valid @RequestBody RefreshTokenDto dto) {
+        authService.logout(dto.refreshToken());
+        //noContent() сразу фиксирует статус 204 и пустое тело — ровно то, что нужно для логаута
+        return ResponseEntity.noContent().build();
     }
 }
