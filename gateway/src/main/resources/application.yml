@@ -1,0 +1,30 @@
+server:
+  port: 8080
+
+spring:
+  cloud:
+    gateway:
+      server:
+        webflux:
+          routes:
+            # /api/auth/** — пути логина/регистрации/рефреша/логаута: JwtGlobalFilter
+            # обязан пропускать их без проверки токена (его смысл теряется, если
+            # сначала нужен токен, чтобы его получить).
+            - id: users-auth
+              uri: http://localhost:8083
+              predicates:
+                - Path=/api/auth/**
+            - id: users-api
+              uri: http://localhost:8083
+              predicates:
+                - Path=/api/users/**
+            - id: rooms-api
+              uri: http://localhost:8081
+              predicates:
+                - Path=/api/rooms/**
+
+# Тот же секрет, что в users/rooms — Gateway тоже только проверяет подпись,
+# не выпускает токены сам.
+app:
+  jwt:
+    secret: v2YSr9p15LCrvF1ftR8X7mC0jfWSdy8nOk95s6WZAvI=

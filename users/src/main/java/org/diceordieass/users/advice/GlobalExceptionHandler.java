@@ -22,6 +22,7 @@ import java.util.stream.Collectors;
  * Когда любой контроллер бросает исключение, которое не поймано внутри самого метода контроллера, Spring MVC идёт искать подходящий {@code @ExceptionHandler} сначала в самом контроллере,
  * а если там нет — по всем классам-{@code @ControllerAdvice}, сопоставляя тип исключения с тем, что указано в {@code @ExceptionHandler(КлассИсключения.class)}
  */
+//подписан на исключения, которые бросает код внутри контроллеров.
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 

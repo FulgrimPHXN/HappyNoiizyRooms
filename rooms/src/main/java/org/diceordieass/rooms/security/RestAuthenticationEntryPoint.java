@@ -1,0 +1,37 @@
+package org.diceordieass.rooms.security;
+
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ProblemDetail;
+import org.springframework.security.core.AuthenticationException;
+import org.springframework.security.web.AuthenticationEntryPoint;
+import org.springframework.stereotype.Component;
+import tools.jackson.databind.ObjectMapper;
+
+import java.io.IOException;
+
+
+//Нужен для кастомизации ответа пользователю при попытке попасть на защищенный ресурс без валидной аутентификации.
+//Нужен помимо ControllerAdvice т.к. не аутентифицированные запросы до DispatcherServlet/контроллера вообще не доходят
+@Component
+@RequiredArgsConstructor
+public class RestAuthenticationEntryPoint implements AuthenticationEntryPoint {
+
+    private final ObjectMapper objectMapper;
+
+    @Override
+    public void commence(HttpServletRequest request, HttpServletResponse response,
+                          AuthenticationException authException) throws IOException, ServletException {
+
+        ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(
+                HttpStatus.UNAUTHORIZED, "Требуется аутентификация");
+
+        response.setStatus(HttpStatus.UNAUTHORIZED.value());
+        response.setContentType(MediaType.APPLICATION_PROBLEM_JSON_VALUE);
+        objectMapper.writeValue(response.getOutputStream(), problemDetail);
+    }
+}

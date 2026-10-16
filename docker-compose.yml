@@ -15,6 +15,25 @@ services:
       timeout: 5s
       retries: 10
 
+  postgres-rooms:
+    image: postgres:18
+    environment:
+      POSTGRES_DB: rooms
+      POSTGRES_USER: rooms
+      POSTGRES_PASSWORD: rooms
+    ports:
+      # 5433, не 5432 — на хосте оба Postgres-контейнера должны отличаться портом,
+      # раз у каждого сервиса своя физически отдельная база (раздел 3 CLAUDE.md), а не
+      # общая. Внутри контейнера порт всё равно родной 5432, конфликта там нет.
+      - "5433:5432"
+    volumes:
+      - postgres-rooms-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rooms -d rooms"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
   prometheus:
     # Пинним конкретную версию, а не latest — чтобы обновление образа не подсовывало
     # тихо несовместимый формат конфига в день, когда никто не планировал этим заниматься.
@@ -56,5 +75,6 @@ services:
 
 volumes:
   postgres-users-data:
+  postgres-rooms-data:
   prometheus-data:
   grafana-data:
