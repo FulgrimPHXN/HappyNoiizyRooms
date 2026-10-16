@@ -42,7 +42,7 @@ public class AuthService {
                 .orElseThrow(() -> new IllegalStateException(
                         "Аутентифицированный пользователь не найден в БД: " + authentication.getName()));
 
-        String token = jwtService.generateToken(user.getUserName());
+        String token = jwtService.generateToken(user.getId());
         String refreshToken = refreshTokenService.createToken(user.getId());
         return new LoginResult(user, token, refreshToken);
 
@@ -64,7 +64,7 @@ public class AuthService {
                 .orElseThrow(() -> new IllegalStateException(
                         "Владелец refresh-токена не найден в БД: " + userId));
 
-        String newAccessToken = jwtService.generateToken(user.getUserName());
+        String newAccessToken = jwtService.generateToken(user.getId());
         //новый refresh выпускается отдельным вызовом — rotate() больше не делает этого сам
         String newRefreshToken = refreshTokenService.createToken(userId);
         return new LoginResult(user, newAccessToken, newRefreshToken);
