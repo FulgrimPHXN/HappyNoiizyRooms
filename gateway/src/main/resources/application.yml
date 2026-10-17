@@ -28,3 +28,9 @@ spring:
 app:
   jwt:
     secret: v2YSr9p15LCrvF1ftR8X7mC0jfWSdy8nOk95s6WZAvI=
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,metrics,prometheus

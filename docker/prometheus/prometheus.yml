@@ -24,3 +24,13 @@ scrape_configs:
           # имя, которое Docker резолвит в адрес хоста; на Linux оно не работает само по
           # себе и требует явной записи extra_hosts в docker-compose.yml (см. там).
           - host.docker.internal:8083
+
+  # Gateway — метрики по маршруту (gateway.requests с тегами routeId/routeUri/
+  # httpStatusCode) появляются автоматически, встроенным GatewayMetricsFilter,
+  # как только Actuator+Micrometer видны в classpath — в коде Gateway для этого
+  # ничего не писали.
+  - job_name: gateway
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets:
+          - host.docker.internal:8080

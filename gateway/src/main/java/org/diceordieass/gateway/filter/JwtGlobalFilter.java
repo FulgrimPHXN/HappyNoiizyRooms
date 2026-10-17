@@ -1,6 +1,7 @@
 package org.diceordieass.gateway.filter;
 
 import io.jsonwebtoken.JwtException;
+import io.micrometer.core.instrument.MeterRegistry;
 import lombok.RequiredArgsConstructor;
 import org.diceordieass.gateway.security.JwtService;
 import org.jspecify.annotations.NullMarked;
@@ -36,6 +37,9 @@ public class JwtGlobalFilter implements GlobalFilter, Ordered {
     private static final List<String> SKIP_PREFIXES = List.of("/api/auth/");
 
     private final JwtService jwtService;
+    //та же MeterRegistry, через которую GatewayMetricsFilter пишет spring_cloud_gateway_requests_seconds —
+    //но её метрика не видит эти отказы (см. ниже), поэтому ведём свой счётчик рядом
+    private final MeterRegistry meterRegistry;
 
     @NullMarked
     @Override
@@ -50,14 +54,14 @@ public class JwtGlobalFilter implements GlobalFilter, Ordered {
         // здесь Gateway сам обязан принять решение, потому что дальше в цепочке никто больше не проверит — отсюда сразу unauthorized(exchange).
         String authHeader = exchange.getRequest().getHeaders().getFirst(HttpHeaders.AUTHORIZATION);
         if (authHeader == null || !authHeader.startsWith(BEARER_PREFIX)) {
-            return unauthorized(exchange);
+            return unauthorized(exchange, path, "missing_token");
         }
 
         String token = authHeader.substring(BEARER_PREFIX.length());
         try {
             jwtService.extractUserId(token);
         } catch (JwtException _) {
-            return unauthorized(exchange);
+            return unauthorized(exchange, path, "invalid_token");
         }
         //заголовок Authorization проксируется дальше автоматически (Gateway по
         //умолчанию копирует входящие заголовки) — :users/:rooms увидят тот же
@@ -74,7 +78,11 @@ public class JwtGlobalFilter implements GlobalFilter, Ordered {
 
     //Выставляем код 401 и заголовок Content-Type - ровно то же самое, что RestAuthenticationEntryPoint делает в сервисах, только здесь нет Spring MVC/Servlet API,
     // поэтому и там, и здесь приходится делать это руками, но через reactive-объект exchange, а не HttpServletResponse.
-    private Mono<Void> unauthorized(ServerWebExchange exchange) {
+    private Mono<Void> unauthorized(ServerWebExchange exchange, String path, String reason) {
+        //этот отказ короткого замыкания не попадает в встроенную spring_cloud_gateway_requests_seconds —
+        //GatewayMetricsFilter стоит в цепочке ПОСЛЕ этого фильтра (эмпирически проверено: без
+        //chain.filter(exchange) метрика вообще не записывается), поэтому считаем сами
+        meterRegistry.counter("gateway.jwt.rejected", "reason", reason, "path", path).increment();
         exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
         exchange.getResponse().getHeaders().setContentType(MediaType.APPLICATION_PROBLEM_JSON);
         byte[] body = "{\"status\":401,\"title\":\"Unauthorized\",\"detail\":\"Требуется аутентификация\"}"
