@@ -52,6 +52,10 @@ public class Room {
         this.inviteCode = generateInviteCode();
     }
 
+    public void rename(String newName) {
+        this.name = newName;
+    }
+
     private static String generateInviteCode() {
         byte[] randomBytes = new byte[16];
         SECURE_RANDOM.nextBytes(randomBytes);

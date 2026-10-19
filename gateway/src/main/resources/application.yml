@@ -7,13 +7,8 @@ spring:
       server:
         webflux:
           routes:
-            # /api/auth/** — пути логина/регистрации/рефреша/логаута: JwtGlobalFilter
-            # обязан пропускать их без проверки токена (его смысл теряется, если
-            # сначала нужен токен, чтобы его получить).
-            - id: users-auth
-              uri: http://localhost:8083
-              predicates:
-                - Path=/api/auth/**
+            # Логин теперь прямо в Keycloak (localhost:8180), не через gateway —
+            # отдельного /api/auth/**-маршрута больше нет.
             - id: users-api
               uri: http://localhost:8083
               predicates:
@@ -23,11 +18,11 @@ spring:
               predicates:
                 - Path=/api/rooms/**
 
-# Тот же секрет, что в users/rooms — Gateway тоже только проверяет подпись,
-# не выпускает токены сам.
+# Keycloak — единственный эмитент токенов. Gateway (как и :users/:rooms отдельно
+# от него) только проверяет подпись по его JWKS, сам токены не выпускает.
 app:
   jwt:
-    secret: v2YSr9p15LCrvF1ftR8X7mC0jfWSdy8nOk95s6WZAvI=
+    jwk-set-uri: http://localhost:8180/realms/happynoizzzyrooms/protocol/openid-connect/certs
 
 management:
   endpoints:

@@ -1,76 +1,72 @@
 package org.diceordieass.users.config;
 
-import lombok.RequiredArgsConstructor;
-import org.diceordieass.users.security.JwtAuthenticationFilter;
+import org.diceordieass.users.security.RestAccessDeniedHandler;
 import org.diceordieass.users.security.RestAuthenticationEntryPoint;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.http.HttpMethod;
-import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.authentication.ProviderManager;
-import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
-import org.springframework.security.core.userdetails.UserDetailsService;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.web.SecurityFilterChain;
-import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
+/*
+ * :users больше не выпускает токены и не хранит credentials — Keycloak единственный
+ * источник identity (см. CLAUDE.md, раздел 4). Поэтому здесь не осталось бинов
+ * AuthenticationManager/PasswordEncoder — этот сервис теперь чистый OAuth2 Resource
+ * Server: Spring Security сам тянет JWKS Keycloak по issuer-uri
+ * (application.properties) и проверяет подпись/срок жизни токена.
+ */
 @Configuration
-@RequiredArgsConstructor
 public class SecurityConfig {
 
-    private final JwtAuthenticationFilter jwtFilter;
-
     @Bean
-    public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder();
+    public JwtAuthenticationConverter jwtAuthenticationConverter() {
+        JwtAuthenticationConverter converter = new JwtAuthenticationConverter();
+        //Keycloak кладёт realm-роли в claim realm_access.roles, а не в "scope"/"scp",
+        //который JwtAuthenticationConverter читает по умолчанию — без этой настройки
+        //hasRole("ADMIN") ниже никогда бы не находил роль ADMIN
+        converter.setJwtGrantedAuthoritiesConverter(jwt -> {
+            Map<String, Object> realmAccess = jwt.getClaimAsMap("realm_access");
+            if (realmAccess == null) {
+                return List.of();
+            }
+            @SuppressWarnings("unchecked")
+            List<String> roles = (List<String>) realmAccess.getOrDefault("roles", List.of());
+            return roles.stream()
+                    .<GrantedAuthority>map(role -> new SimpleGrantedAuthority("ROLE_" + role))
+                    .toList();
+        });
+        return converter;
     }
 
     @Bean
-    public AuthenticationManager authenticationManager(
-            UserDetailsService userDetailsService, PasswordEncoder passwordEncoder) {
-        //конкретная реализация AuthenticationProvider, умеющая проверять логин/пароль через UserDetailsService
-        DaoAuthenticationProvider authProvider = new DaoAuthenticationProvider(userDetailsService);
-        //говорит, каким алгоритмом сверять пароль с хэшем в БД
-        authProvider.setPasswordEncoder(passwordEncoder);
-        return new ProviderManager(authProvider);
-    }
-
-
-    @Bean
-    //Цепочка вызовов на http — каждый метод настраивает свою, независимую друг от друга заботу
-    // (порядок между ними, в отличие от матчеров внутри authorizeHttpRequests, не важен)
-    @SuppressWarnings("java:S1149")
     public SecurityFilterChain securityFilterChain(
-            HttpSecurity http, RestAuthenticationEntryPoint restEntryPoint) {
-        //Это весь путь запроса целиком: JwtAuthenticationFilter пытается аутентифицировать по токену → authorizeHttpRequests решает,
-        // пускать или нет, с учётом того, что permitAll()-пути вообще не требуют результата первого шага → если отклонено,
-        // exceptionHandling передаёт решение твоему RestAuthenticationEntryPoint, который формирует честный 401.
+            HttpSecurity http,
+            RestAuthenticationEntryPoint restEntryPoint,
+            RestAccessDeniedHandler restAccessDeniedHandler,
+            JwtAuthenticationConverter jwtAuthenticationConverter) {
         return http
                 .csrf(AbstractHttpConfigurer::disable)
-                //запрещает создавать или читать HttpSession вообще
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                //говорит Spring Security: если запрос не прошёл аутентификацию на защищённом пути, не отдавай свой дефолтный голый 403,
-                // а вызови restEntryPoint.commence(...), который вернёт честный 401 в формате ProblemDetail.
-                .exceptionHandling(ex -> ex.authenticationEntryPoint(restEntryPoint))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers(HttpMethod.POST, "/api/auth/register").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/api/auth/login").permitAll()
-                        //refresh и logout проверяют право действовать сами, по raw refresh-токену в теле запроса —
-                        //это их credential, а не access-JWT в заголовке (которого на момент вызова refresh уже может не быть валидным)
-                        .requestMatchers(HttpMethod.POST, "/api/auth/refresh").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/api/auth/logout").permitAll()
-                        //метрики/health открыты без JWT ради удобства локальной разработки (localhost не торчит
-                        //наружу) — на реальном проде это обычно прячут за отдельным management-портом/приватной сетью
-                        .requestMatchers("/actuator/**").permitAll()
+                        //health открыт без JWT — его читают внешние health-check'и, не люди
+                        .requestMatchers("/actuator/health").permitAll()
+                        //метрики видят внутренние цифры сервиса — доступ только роли ADMIN
+                        //из realm_access.roles токена (CLAUDE.md, раздел 4)
+                        .requestMatchers("/actuator/metrics/**", "/actuator/prometheus").hasRole("ADMIN")
                         .anyRequest().authenticated())
-                //Вставляет твой JwtAuthenticationFilter в цепочку перед стандартным (из коробки Spring Security) UsernamePasswordAuthenticationFilter.
-                // Именно этот фильтр читает заголовок Authorization, проверяет токен через JwtService и кладёт Authentication в SecurityContextHolder,
-                // если токен валиден.
-                .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
+                .exceptionHandling(exceptions -> exceptions
+                        .accessDeniedHandler(restAccessDeniedHandler))
+                .oauth2ResourceServer(oauth2 -> oauth2
+                        .authenticationEntryPoint(restEntryPoint)
+                        .jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter)))
                 .build();
     }
 }

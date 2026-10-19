@@ -1,9 +1,7 @@
 package org.diceordieass.gateway.filter;
 
-import io.jsonwebtoken.JwtException;
 import io.micrometer.core.instrument.MeterRegistry;
 import lombok.RequiredArgsConstructor;
-import org.diceordieass.gateway.security.JwtService;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.cloud.gateway.filter.GlobalFilter;
@@ -12,31 +10,32 @@ import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.oauth2.jwt.JwtException;
 import org.springframework.stereotype.Component;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 
 import java.nio.charset.StandardCharsets;
-import java.util.List;
 
 /*
- * Reactive-аналог JwtAuthenticationFilter, но здесь нет
- * Spring Security вообще (ни SecurityContextHolder, ни SecurityFilterChain):
- * Gateway не аутентифицирует запрос для себя, он просто решает "пропустить
- * дальше или оборвать здесь". Это первый, самый быстрый уровень
- * defense-in-depth — сервисы всё равно проверяют токен ещё раз сами,
- * своим собственным JwtAuthenticationFilter, независимо от этого решения.
+ * Reactive-аналог проверки подписи в сервисах, но здесь нет Spring Security
+ * вообще (ни SecurityContextHolder, ни SecurityFilterChain): Gateway не
+ * аутентифицирует запрос для себя, он просто решает "пропустить дальше или
+ * оборвать здесь". Это первый, самый быстрый уровень defense-in-depth —
+ * :users/:rooms всё равно проверяют тот же токен ещё раз сами, своим
+ * собственным Resource Server-конфигом, независимо от этого решения.
+ * Токен теперь выпускает Keycloak — отсюда JwtDecoder (NimbusJwtDecoder по
+ * JWKS), а не самодельный HMAC-секрет. /api/auth/** больше нет: за токеном
+ * клиент идёт прямо в Keycloak, не через наш gateway.
  */
 @Component
 @RequiredArgsConstructor
 public class JwtGlobalFilter implements GlobalFilter, Ordered {
 
     private static final String BEARER_PREFIX = "Bearer ";
-    //эти пути существуют именно для получения токена — требовать токен,
-    //чтобы получить токен, лишает их смысла
-    private static final List<String> SKIP_PREFIXES = List.of("/api/auth/");
 
-    private final JwtService jwtService;
+    private final JwtDecoder jwtDecoder;
     //та же MeterRegistry, через которую GatewayMetricsFilter пишет spring_cloud_gateway_requests_seconds —
     //но её метрика не видит эти отказы (см. ниже), поэтому ведём свой счётчик рядом
     private final MeterRegistry meterRegistry;
@@ -44,12 +43,7 @@ public class JwtGlobalFilter implements GlobalFilter, Ordered {
     @NullMarked
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
-        //Достаём путь запроса (/api/rooms, /api/auth/login и т.п.). Если он начинается с одного из путей-исключений - сразу зовём chain.filter(exchange) (аналог filterChain.doFilter(...)
-        // в servlet-мире: «я закончил, передаю дальше, не вмешиваясь») и выходим — без проверки токена.
         String path = exchange.getRequest().getURI().getPath();
-        if (SKIP_PREFIXES.stream().anyMatch(path::startsWith)) {
-            return chain.filter(exchange);
-        }
         //Достаём заголовок Authorization. Если его нет или он не той схемы - в отличие от JWT фильтров в сервисах (где это молча пропускается дальше, а решение «нужна ли аутентификация» отдаётся Spring Security),
         // здесь Gateway сам обязан принять решение, потому что дальше в цепочке никто больше не проверит — отсюда сразу unauthorized(exchange).
         String authHeader = exchange.getRequest().getHeaders().getFirst(HttpHeaders.AUTHORIZATION);
@@ -59,7 +53,7 @@ public class JwtGlobalFilter implements GlobalFilter, Ordered {
 
         String token = authHeader.substring(BEARER_PREFIX.length());
         try {
-            jwtService.extractUserId(token);
+            jwtDecoder.decode(token);
         } catch (JwtException _) {
             return unauthorized(exchange, path, "invalid_token");
         }
