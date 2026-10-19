@@ -1,31 +1,19 @@
 services:
-  keycloak:
-    # аутентификацию и выдачу JWT делает
-    # Keycloak (внешний Identity Provider), а каждый сервис проверяет подпись
-    # токена сам, по его публичному набору ключей (JWKS). start-dev — встроенное dev-хранилище без отдельной БД:
-    image: quay.io/keycloak/keycloak:26.6.2
-    command: start-dev --import-realm
+  postgres-users:
+    image: postgres:18
     environment:
-      KC_BOOTSTRAP_ADMIN_USERNAME: admin
-      KC_BOOTSTRAP_ADMIN_PASSWORD: admin
-      # Без этого issuer (claim "iss" в токене) берётся из заголовка Host запроса —
-      # т.е. у токена, который Prometheus получает через внутреннюю docker-сеть
-      # ("keycloak:8080"), issuer был бы другим, чем у токена, полученного с хоста
-      # ("localhost:8180"). :users/:rooms сверяют issuer-uri строго (это один из
-      # штатных валидаторов Spring Security OAuth2 Resource Server) — фиксируем
-      # issuer одним значением независимо от того, с какой стороны пришёл запрос.
-      # Keycloak 26 — провайдер hostname:v2: полный URL в одной переменной, а не
-      # отдельные hostname/hostname-port (те — устаревший v1-стиль, в логах
-      # предупреждение и порт из них фактически не применяется).
-      KC_HOSTNAME: http://localhost:8180
+      POSTGRES_DB: users
+      POSTGRES_USER: users
+      POSTGRES_PASSWORD: users
     ports:
-      # Отдельный от gateway (8080) порт — клиенты (и сервисы при проверке JWKS)
-      # ходят сюда напрямую, не через наш gateway.
-      - "8180:8080"
+      - "5432:5432"
     volumes:
-      # Realm/клиент/тестовый пользователь — заводятся автоматически при старте
-      # (--import-realm), а не руками через Admin Console.
-      - ./docker/keycloak/realm-export.json:/opt/keycloak/data/import/realm-export.json:ro
+      - postgres-users-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U users -d users"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
   postgres-rooms:
     image: postgres:18
@@ -34,9 +22,9 @@ services:
       POSTGRES_USER: rooms
       POSTGRES_PASSWORD: rooms
     ports:
-      # 5433, не 5432 — чтобы не конфликтовать с возможным локальным Postgres на
-      # хосте, который слушает дефолтный 5432. Внутри контейнера порт всё равно
-      # родной 5432 — меняется только то, как этот порт виден снаружи контейнера.
+      # 5433, не 5432 — на хосте оба Postgres-контейнера должны отличаться портом,
+      # раз у каждого сервиса своя физически отдельная база (раздел 3 CLAUDE.md), а не
+      # общая. Внутри контейнера порт всё равно родной 5432, конфликта там нет.
       - "5433:5432"
     volumes:
       - postgres-rooms-data:/var/lib/postgresql
@@ -77,8 +65,8 @@ services:
       # все они живут только в слое контейнера и исчезают при `docker compose down`.
       - grafana-data:/var/lib/grafana
     environment:
-      # Простой пароль для локальной разработки: сервис не торчит дальше localhost,
-      # так что секрет-менеджер здесь не даёт реальной защиты, только лишнюю возню.
+      # Простой пароль для локальной разработки — тот же принцип, что и у Postgres выше:
+      # сервис не торчит дальше localhost, секрет-менеджер здесь не нужен.
       GF_SECURITY_ADMIN_PASSWORD: grafana
     # Не обязательно для работы (Grafana подключится к Prometheus по требованию, когда
     # реально понадобится), но этот порядок старта логичнее читается в выводе `docker compose up`.
@@ -86,6 +74,7 @@ services:
       - prometheus
 
 volumes:
+  postgres-users-data:
   postgres-rooms-data:
   prometheus-data:
   grafana-data:

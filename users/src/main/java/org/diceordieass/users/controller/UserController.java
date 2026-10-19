@@ -1,30 +1,37 @@
 package org.diceordieass.users.controller;
 
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.diceordieass.users.dto.ChangeUserNameRequest;
+import org.diceordieass.users.dto.ChangeUserPasswordRequest;
+import org.diceordieass.users.dto.UserResponse;
+import org.diceordieass.users.service.UserService;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.security.oauth2.jwt.Jwt;
-import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.Map;
-
-/*
- * Смена пароля/имени ушла в Keycloak целиком (Account Console/Admin API) — это его
- * credentials, не наши. Единственное, что осталось в :users после переноса логина на
- * Keycloak — smoke-test того, что Resource Server правильно проверяет подпись и
- * прокидывает claims токена. Настоящие профильные данные появятся здесь, когда они
- * реально понадобятся домену (см. CLAUDE.md, раздел 4) — пока их нет, не городим DTO
- * под то, чего не существует.
- */
 @RestController
+@RequiredArgsConstructor
 @RequestMapping("/api/users")
 public class UserController {
 
-    @GetMapping("/me")
-    public ResponseEntity<Map<String, Object>> getCurrentUser(@AuthenticationPrincipal Jwt jwt) {
-        return ResponseEntity.ok(Map.of(
-                "id", jwt.getSubject(),
-                "claims", jwt.getClaims()));
+    private final UserService userService;
+
+
+    @PatchMapping("/password")
+    public ResponseEntity<Void> changePassword(Authentication authentication,
+                                               @Valid @RequestBody ChangeUserPasswordRequest dto) {
+        userService.changePassword(authentication, dto);
+      return ResponseEntity.noContent().build();
     }
+
+    @PatchMapping("/username")
+    public ResponseEntity<UserResponse> changeUserName(Authentication authentication,
+            @Valid @RequestBody ChangeUserNameRequest dto) {
+       return ResponseEntity.ok(UserResponse.from(userService.changeUserName(authentication, dto))) ;
+    }
+
 }

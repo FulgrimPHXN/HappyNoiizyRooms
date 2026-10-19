@@ -15,25 +15,6 @@ scrape_configs:
     # поэтому явно переопределяем.
     metrics_path: /actuator/prometheus
 
-    # /actuator/prometheus у :users требует роль ADMIN в JWT — без токена Prometheus
-    # получал бы 401/403, и метрики пропали бы. У Prometheus 2.27+ есть встроенная
-    # поддержка OAuth2 client-credentials: сам ходит в token_url за токеном, сам
-    # обновляет его по истечении срока — без этого блока пришлось бы вручную
-    # генерировать и прописывать статический токен, который к тому же протухнет.
-    # client_id "prometheus" — confidential-клиент в Keycloak с включённым service
-    # account, которому в realm'е назначена роль ADMIN (так же, как администратору-
-    # человеку) — для Keycloak это просто ещё один клиент с ролью, не особый случай.
-    oauth2:
-      client_id: prometheus
-      client_secret: prometheus-secret
-      # Keycloak — соседний контейнер в той же docker-сети (docker compose создаёт
-      # её автоматически и даёт каждому контейнеру имя его сервиса как DNS-имя),
-      # поэтому Prometheus обращается к нему по имени сервиса "keycloak" и его
-      # родному порту внутри контейнера — 8080. Порт 8180 — это проекция наружу,
-      # на хост-машину, она тут ни при чём: изнутри docker-сети Keycloak всегда
-      # слушает именно 8080, независимо от того, на какой порт хоста он вынесен.
-      token_url: http://keycloak:8080/realms/happynoizzzyrooms/protocol/openid-connect/token
-
     # Список адресов, которые нужно опрашивать для этого job'а.
     static_configs:
       - targets:
@@ -41,9 +22,7 @@ scrape_configs:
           # Prometheus живёт внутри docker-сети — значит "localhost" тут означало бы
           # "сам контейнер Prometheus", а не хост-машину. "host.docker.internal" — особое
           # имя, которое Docker резолвит в адрес хоста; на Linux оно не работает само по
-          # себе — контейнеру Prometheus нужна явная запись в /etc/hosts, добавленная
-          # через ключ `extra_hosts: - "host.docker.internal:host-gateway"` в описании
-          # его сервиса в docker-compose.yml (без неё имя просто не резолвится).
+          # себе и требует явной записи extra_hosts в docker-compose.yml (см. там).
           - host.docker.internal:8083
 
   # Gateway — метрики по маршруту (gateway.requests с тегами routeId/routeUri/
@@ -52,13 +31,6 @@ scrape_configs:
   # ничего не писали.
   - job_name: gateway
     metrics_path: /actuator/prometheus
-    # /actuator/prometheus у :gateway тоже требует роль ADMIN в JWT — тот же
-    # service-account клиент Keycloak, что и в job'е users выше, выдаёт токен сам
-    # себе через client-credentials и обновляет его по истечении срока.
-    oauth2:
-      client_id: prometheus
-      client_secret: prometheus-secret
-      token_url: http://keycloak:8080/realms/happynoizzzyrooms/protocol/openid-connect/token
     static_configs:
       - targets:
           - host.docker.internal:8080
