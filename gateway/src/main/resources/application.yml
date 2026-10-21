@@ -21,6 +21,9 @@ spring:
             - id: rooms-api
               uri: http://localhost:8081
               predicates:
+                # RoomController слушает /api/rooms — маршрут должен совпадать
+                # буквально, иначе gateway отдаёт 404 раньше, чем запрос вообще
+                # доходит до :rooms.
                 - Path=/api/rooms/**
 
 # Тот же секрет, что в users/rooms — Gateway тоже только проверяет подпись,
