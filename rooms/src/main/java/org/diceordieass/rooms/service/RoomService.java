@@ -8,19 +8,22 @@ import org.diceordieass.rooms.exception.InvalidInviteCodeException;
 import org.diceordieass.rooms.exception.PlayerAlreadyJoinedException;
 import org.diceordieass.rooms.exception.PlayerNotInRoomException;
 import org.diceordieass.rooms.exception.RoomAlreadyExistsException;
+import org.diceordieass.rooms.exception.RoomAccessDeniedException;
 import org.diceordieass.rooms.repository.RoomRepository;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 import java.util.NoSuchElementException;
-import java.util.Optional;
 import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
+@Transactional(readOnly = true)
 public class RoomService {
 
     private final RoomRepository roomRepository;
 
+    @Transactional
     public Room createRoom(UUID ownerId, RoomRequestDto roomRequestDto) {
         roomRepository.findRoomByName(roomRequestDto.roomName()).ifPresent(existing -> {
             throw new RoomAlreadyExistsException(roomRequestDto.roomName());
@@ -28,25 +31,32 @@ public class RoomService {
         return roomRepository.save(new Room(roomRequestDto.roomName(), ownerId));
     }
 
-    public Room getRoom(UUID roomId) {
-        return roomRepository.findById(roomId)
+    public Room getRoom(UUID roomId, UUID callerId) {
+        Room room = roomRepository.findById(roomId)
                 .orElseThrow(() -> new NoSuchElementException("Комната не найдена"));
+        if (!room.getPlayers().containsKey(callerId)) {
+            throw new RoomAccessDeniedException();
+        }
+        return room;
     }
 
     public List<Room> getOwnerRooms(UUID ownerId) {
         return roomRepository.findRoomByOwnerId(ownerId);
     }
 
+    @Transactional
     public Room updateRoom(UUID roomId, UUID callerId, RoomRequestDto dto) {
         Room room = checkRoomOwner(roomId, callerId);
         room.rename(dto.roomName());
-        return roomRepository.save(room);
+        return room;
     }
 
+    @Transactional
     public void deleteRoom(UUID roomId, UUID callerId) {
-        roomRepository.deleteById((checkRoomOwner(roomId, callerId)).getId());
+        roomRepository.delete(checkRoomOwner(roomId, callerId));
     }
 
+    @Transactional
     public Room joinRoom(UUID roomId, UUID callerId, String inviteCode) {
         Room room = roomRepository.findRoomById(roomId)
                 .orElseThrow(() -> new NoSuchElementException("Комната не найдена"));
@@ -57,24 +67,29 @@ public class RoomService {
             throw new PlayerAlreadyJoinedException();
         }
         room.addPlayer(callerId, RoomRole.PLAYER);
-        return roomRepository.save(room);
+        return room;
     }
 
+    @Transactional
     public Room leaveRoom(UUID roomId, UUID callerId) {
         Room room = roomRepository.findRoomById(roomId)
                 .orElseThrow(() -> new NoSuchElementException("Комната не найдена"));
         if (!room.getPlayers().containsKey(callerId)) {
             throw new PlayerNotInRoomException();
         }
+        if (room.getOwnerId().equals(callerId)) {
+            throw new RoomAccessDeniedException();
+        }
         room.removePlayer(callerId);
-        return roomRepository.save(room);
+        return room;
     }
 
     private Room checkRoomOwner (UUID roomId, UUID callerId) {
         Room room =  roomRepository.findRoomById((roomId))
                 .orElseThrow(NoSuchElementException::new);
-        return Optional.of(room)
-                .filter(r -> r.getOwnerId().equals(callerId))
-                .orElseThrow(NoSuchElementException::new);
+        if (!room.getOwnerId().equals(callerId)) {
+            throw new RoomAccessDeniedException();
+        }
+        return room;
     }
 }

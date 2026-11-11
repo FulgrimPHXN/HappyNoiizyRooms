@@ -51,6 +51,7 @@ public class Room {
         this.name = Objects.requireNonNull(name, "name must not be null");
         this.ownerId = Objects.requireNonNull(ownerId, "ownerId must not be null");
         this.inviteCode = generateInviteCode();
+        players.put(ownerId, RoomRole.GM);
     }
 
     public void regenerateInviteCode() {
@@ -58,7 +59,7 @@ public class Room {
     }
 
     public void rename(String newName) {
-        this.name = newName;
+        this.name = Objects.requireNonNull(newName, "name must not be null");
     }
 
     public Map<UUID, RoomRole> getPlayers() {

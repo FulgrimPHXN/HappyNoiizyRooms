@@ -29,8 +29,8 @@ public class RoomController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<RoomDto> getRoom(@PathVariable("id") UUID roomId) {
-        return ResponseEntity.ok(RoomDto.from(roomService.getRoom(roomId)));
+    public ResponseEntity<RoomDto> getRoom(@PathVariable("id") UUID roomId, @AuthenticationPrincipal UUID callerId) {
+        return ResponseEntity.ok(RoomDto.from(roomService.getRoom(roomId, callerId)));
     }
 
     @GetMapping
