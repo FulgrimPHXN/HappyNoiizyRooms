@@ -7,9 +7,7 @@ spring:
       server:
         webflux:
           routes:
-            # /api/auth/** — пути логина/регистрации/рефреша/логаута: JwtGlobalFilter
-            # обязан пропускать их без проверки токена (его смысл теряется, если
-            # сначала нужен токен, чтобы его получить).
+
             - id: users-auth
               uri: http://localhost:8083
               predicates:
@@ -21,13 +19,9 @@ spring:
             - id: rooms-api
               uri: http://localhost:8081
               predicates:
-                # RoomController слушает /api/rooms — маршрут должен совпадать
-                # буквально, иначе gateway отдаёт 404 раньше, чем запрос вообще
-                # доходит до :rooms.
+
                 - Path=/api/rooms/**
 
-# Тот же секрет, что в users/rooms — Gateway тоже только проверяет подпись,
-# не выпускает токены сам.
 app:
   jwt:
     secret: v2YSr9p15LCrvF1ftR8X7mC0jfWSdy8nOk95s6WZAvI=

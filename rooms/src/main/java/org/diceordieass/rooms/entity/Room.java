@@ -1,6 +1,5 @@
 package org.diceordieass.rooms.entity;
 
-
 import com.github.f4b6a3.uuid.UuidCreator;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
@@ -9,6 +8,9 @@ import lombok.NoArgsConstructor;
 
 import java.security.SecureRandom;
 import java.util.Base64;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 
@@ -32,11 +34,17 @@ public class Room {
     @Column(name = "name")
     private String name;
 
-    //секрет для ссылки-приглашения — намеренно не id: id светится в каждом обычном
-    //запросе на просмотр/правку комнаты, а inviteCode должен быть отзываемым отдельно
-    //от самой комнаты (см. regenerateInviteCode)
+    // Отдельный секрет позволяет отозвать приглашение без смены ID комнаты.
     @Column(name = "invite_code", unique = true)
     private String inviteCode;
+
+    // Участие принадлежит комнате и хранится вместе с ней, без отдельной сущности пользователя.
+    @ElementCollection
+    @CollectionTable(name = "room_players", joinColumns = @JoinColumn(name = "room_id"))
+    @MapKeyColumn(name = "user_id")
+    @Enumerated(EnumType.STRING)
+    @Column(name = "role")
+    private Map<UUID, RoomRole> players = new HashMap<>();
 
     public Room (String name, UUID ownerId) {
         this.id = UuidCreator.getTimeOrderedEpoch();
@@ -45,15 +53,26 @@ public class Room {
         this.inviteCode = generateInviteCode();
     }
 
-    //отозвать старую ссылку-приглашение, не трогая саму комнату — старая ссылка
-    //сразу перестаёт работать, новую отдаёт вызывающий код (из возвращаемого значения
-    //геттера после вызова), это не отдельная сущность с историей, а просто смена секрета
     public void regenerateInviteCode() {
         this.inviteCode = generateInviteCode();
     }
 
     public void rename(String newName) {
         this.name = newName;
+    }
+
+    public Map<UUID, RoomRole> getPlayers() {
+        // Изменения состава проходят только через методы комнаты.
+        return Collections.unmodifiableMap(players);
+    }
+
+    public void addPlayer(UUID userId, RoomRole role) {
+        players.put(Objects.requireNonNull(userId, "userId must not be null"),
+                Objects.requireNonNull(role, "role must not be null"));
+    }
+
+    public void removePlayer(UUID userId) {
+        players.remove(userId);
     }
 
     private static String generateInviteCode() {

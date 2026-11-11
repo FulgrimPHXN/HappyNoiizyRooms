@@ -22,9 +22,8 @@ services:
       POSTGRES_USER: rooms
       POSTGRES_PASSWORD: rooms
     ports:
-      # 5433, не 5432 — на хосте оба Postgres-контейнера должны отличаться портом,
-      # раз у каждого сервиса своя физически отдельная база (раздел 3 CLAUDE.md), а не
-      # общая. Внутри контейнера порт всё равно родной 5432, конфликта там нет.
+
+      # Отдельный порт хоста для второй базы PostgreSQL.
       - "5433:5432"
     volumes:
       - postgres-rooms-data:/var/lib/postgresql
@@ -35,41 +34,33 @@ services:
       retries: 10
 
   prometheus:
-    # Пинним конкретную версию, а не latest — чтобы обновление образа не подсовывало
-    # тихо несовместимый формат конфига в день, когда никто не планировал этим заниматься.
+
     image: prom/prometheus:v2.54.1
     volumes:
-      # Сам конфиг (какие цели опрашивать) — читаем с хоста как read-only: Prometheus его
-      # не должен и не умеет менять сам, правим только руками на хосте.
+
       - ./docker/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-      # Накопленная история метрик (TSDB) — именованный том, чтобы не терялась
-      # при `docker compose down` (но терялась бы при `down -v`, как и Postgres-данные).
+
       - prometheus-data:/prometheus
     ports:
-      # Веб-UI/API самого Prometheus (его собственный встроенный график-обзреватель,
-      # отдельно от Grafana) — удобно для быстрой проверки "видит ли Prometheus цель живой".
+
       - "9090:9090"
-    # На Linux (в отличие от Docker Desktop на Mac/Windows) "host.docker.internal" не
-    # резолвится из коробки — "host-gateway" — служебное значение, которое docker compose
-    # сам подставляет вместо него реальным IP хоста при старте контейнера.
+
+    # Prometheus обращается к сервисам на хосте, в том числе на Linux.
     extra_hosts:
       - "host.docker.internal:host-gateway"
 
   grafana:
     image: grafana/grafana:11.2.0
     ports:
-      # Веб-UI Grafana — порт, который открываете в браузере.
+
       - "3000:3000"
     volumes:
-      # Дашборды/настройки/источники данных, которые вы сохраните через UI — без тома
-      # все они живут только в слое контейнера и исчезают при `docker compose down`.
+
       - grafana-data:/var/lib/grafana
     environment:
-      # Простой пароль для локальной разработки — тот же принцип, что и у Postgres выше:
-      # сервис не торчит дальше localhost, секрет-менеджер здесь не нужен.
+
       GF_SECURITY_ADMIN_PASSWORD: grafana
-    # Не обязательно для работы (Grafana подключится к Prometheus по требованию, когда
-    # реально понадобится), но этот порядок старта логичнее читается в выводе `docker compose up`.
+
     depends_on:
       - prometheus
 

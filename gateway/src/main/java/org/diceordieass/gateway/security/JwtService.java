@@ -11,10 +11,6 @@ import org.springframework.stereotype.Service;
 import javax.crypto.SecretKey;
 import java.util.UUID;
 
-/*
- * Та же роль, что у rooms.security.JwtService: Gateway тоже только проверяет
- * подпись, никогда не выпускает токены сам.
- */
 @Service
 public class JwtService {
 

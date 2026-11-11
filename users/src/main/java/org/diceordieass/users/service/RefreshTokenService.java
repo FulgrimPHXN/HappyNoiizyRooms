@@ -37,38 +37,34 @@ public class RefreshTokenService {
                 .ifPresent(RefreshToken::revoke);
     }
 
-    //метод отзыва старого refresh токена с подтверждением его владельца
-    //создание нового токена сюда больше не входит: этому методу для подтверждения владельца
-    //нужен только userId, а чем дальше распорядится вызывающий код (новый access + новый refresh) — не его забота
+    // Возвращает владельца; выпуск новой пары токенов координирует AuthService.
     @Transactional
     public UUID rotate(String rawOldToken) {
-        //хеш refresh токена клиента хранится в бд, мы сравниваем его с его же сырым токеном
+
         RefreshToken token = refreshTokenRepository.findByTokenHash(hash(rawOldToken))
                 .orElseThrow(() ->  new InvalidRefreshTokenException("Invalid Refresh Token"));
 
-        //Если токен был отозван, то отзывает вообще все активные токены этого пользователя
-        // потому что повторное предъявление уже использованного токена — признак кражи
+        // Повторное использование отозванного токена рассматриваем как возможную кражу.
         Optional.of(token).filter(RefreshToken::isRevoked).ifPresent(rt -> {
             revokeAllForUser(rt.getUserId());
             throw new InvalidRefreshTokenException("Invalid Refresh Token");
         });
-        //время токена вышло
+
         if (token.getExpiredAt().isBefore(Instant.now())) {
             throw new InvalidRefreshTokenException("Invalid Refresh Token");
         }
-        //старый токен протухает
+
         token.revoke();
-        //отдаём наружу владельца токена — вызывающий код сам решает, что с этим делать
-        //(новый access-JWT нужен username, новый refresh — отдельный вызов createToken)
+
         return token.getUserId();
     }
 
     public String createToken(UUID userId) {
-        //создает случайную строку
+
         String rawToken = generateToken();
-        //хеширует для хранения
+
         String tokenHash = hash(rawToken);
-        //Текущий момент + TTL из конфига = момент истечения.
+
         Instant expiresAt = Instant.now().plusMillis(refreshExpireTime);
         refreshTokenRepository.save(new RefreshToken(userId, tokenHash, expiresAt));
         return rawToken;

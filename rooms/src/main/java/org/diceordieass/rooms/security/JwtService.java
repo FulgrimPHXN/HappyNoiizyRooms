@@ -11,13 +11,6 @@ import org.springframework.stereotype.Service;
 import javax.crypto.SecretKey;
 import java.util.UUID;
 
-/*
- * В отличие от users.security.JwtService, здесь нет generateToken и expirationMs:
- * :rooms никогда не выпускает JWT — он только проверяет подпись токена, выпущенного
- * :users (общий секрет, см. комментарий в rooms/application.properties). Урезанный
- * класс — не копия ради экономии, а честное отражение того, что этому сервису
- * реально нужно.
- */
 @Service
 public class JwtService {
 

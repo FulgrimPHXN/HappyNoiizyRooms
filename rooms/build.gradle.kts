@@ -5,8 +5,7 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-security")
     implementation("org.springframework.boot:spring-boot-starter-validation")
     implementation(libs.uuid.creator)
-    //нужен тот же набор jjwt-зависимостей, что в :users, хотя :rooms не выпускает токены —
-    //проверка подписи (Jwts.parser()...) требует jjwt-impl в runtime так же, как и генерация
+
     implementation(libs.jjwt.api)
 
     runtimeOnly("org.postgresql:postgresql")

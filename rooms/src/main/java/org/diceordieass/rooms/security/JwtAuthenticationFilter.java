@@ -39,11 +39,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         try {
             UUID userId = jwtService.extractUserId(token);
-            //principal — сам UUID, не UserDetails: у :rooms нет локальной таблицы пользователей
-            //и нет понятия "роль" на уровне Spring Security — кто владелец комнаты, а кто просто
-            //участник, решает доменная логика Room/Player, а не authorities здесь. authorities
-            //пустой список — authenticated() ниже в SecurityConfig не требует конкретной роли,
-            //только сам факт валидного токена.
+
+            // В rooms нет таблицы пользователей; права в комнате проверяет доменная логика.
             UsernamePasswordAuthenticationToken authentication =
                     new UsernamePasswordAuthenticationToken(userId, null, List.of());
             authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));

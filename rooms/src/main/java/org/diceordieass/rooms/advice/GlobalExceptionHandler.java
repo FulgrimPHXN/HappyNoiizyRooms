@@ -1,5 +1,10 @@
 package org.diceordieass.rooms.advice;
 
+import jakarta.validation.ConstraintViolation;
+import jakarta.validation.ConstraintViolationException;
+import org.diceordieass.rooms.exception.InvalidInviteCodeException;
+import org.diceordieass.rooms.exception.PlayerAlreadyJoinedException;
+import org.diceordieass.rooms.exception.PlayerNotInRoomException;
 import org.diceordieass.rooms.exception.RoomAccessDeniedException;
 import org.diceordieass.rooms.exception.RoomAlreadyExistsException;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -34,6 +39,22 @@ public class GlobalExceptionHandler {
         return problemDetails;
     }
 
+    @ExceptionHandler(ConstraintViolationException.class)
+    public ProblemDetail handleConstraintViolation(ConstraintViolationException e) {
+        Map<String, String> errors = e.getConstraintViolations().stream()
+                .collect(Collectors.toMap(v -> lastSegment(v.getPropertyPath().toString()),
+                        ConstraintViolation::getMessage, (first, second) -> first));
+        ProblemDetail problemDetails = ProblemDetail
+                .forStatusAndDetail(HttpStatus.BAD_REQUEST, "Ошибка валидации");
+        problemDetails.setProperty("errors", errors);
+        return problemDetails;
+    }
+
+    private static String lastSegment(String propertyPath) {
+        int lastDot = propertyPath.lastIndexOf('.');
+        return lastDot == -1 ? propertyPath : propertyPath.substring(lastDot + 1);
+    }
+
     @ExceptionHandler(RoomAlreadyExistsException.class)
     public ProblemDetail handleRoomAlreadyExists (RoomAlreadyExistsException e) {
         return ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, e.getMessage());
@@ -44,9 +65,21 @@ public class GlobalExceptionHandler {
         return ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, e.getMessage());
     }
 
-    //сюда попадаем, когда предварительный findRoomByName не успел поймать гонку —
-    //UNIQUE на name в БД сработал первым; сообщение нейтральное, не e.getMessage(),
-    //чтобы не светить клиенту имя constraint'а/колонки из текста драйвера
+    @ExceptionHandler(InvalidInviteCodeException.class)
+    public ProblemDetail handleInvalidInviteCode(InvalidInviteCodeException e) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, e.getMessage());
+    }
+
+    @ExceptionHandler(PlayerAlreadyJoinedException.class)
+    public ProblemDetail handlePlayerAlreadyJoined(PlayerAlreadyJoinedException e) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, e.getMessage());
+    }
+
+    @ExceptionHandler(PlayerNotInRoomException.class)
+    public ProblemDetail handlePlayerNotInRoom(PlayerNotInRoomException e) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, e.getMessage());
+    }
+
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ProblemDetail handleDataIntegrityViolation(DataIntegrityViolationException e) {
         return ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, "Комната с таким названием уже существует");

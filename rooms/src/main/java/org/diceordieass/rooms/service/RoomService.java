@@ -3,6 +3,10 @@ package org.diceordieass.rooms.service;
 import lombok.RequiredArgsConstructor;
 import org.diceordieass.rooms.dto.RoomRequestDto;
 import org.diceordieass.rooms.entity.Room;
+import org.diceordieass.rooms.entity.RoomRole;
+import org.diceordieass.rooms.exception.InvalidInviteCodeException;
+import org.diceordieass.rooms.exception.PlayerAlreadyJoinedException;
+import org.diceordieass.rooms.exception.PlayerNotInRoomException;
 import org.diceordieass.rooms.exception.RoomAlreadyExistsException;
 import org.diceordieass.rooms.repository.RoomRepository;
 import org.springframework.stereotype.Service;
@@ -41,6 +45,29 @@ public class RoomService {
 
     public void deleteRoom(UUID roomId, UUID callerId) {
         roomRepository.deleteById((checkRoomOwner(roomId, callerId)).getId());
+    }
+
+    public Room joinRoom(UUID roomId, UUID callerId, String inviteCode) {
+        Room room = roomRepository.findRoomById(roomId)
+                .orElseThrow(() -> new NoSuchElementException("Комната не найдена"));
+        if (!room.getInviteCode().equals(inviteCode)) {
+            throw new InvalidInviteCodeException();
+        }
+        if (room.getPlayers().containsKey(callerId)) {
+            throw new PlayerAlreadyJoinedException();
+        }
+        room.addPlayer(callerId, RoomRole.PLAYER);
+        return roomRepository.save(room);
+    }
+
+    public Room leaveRoom(UUID roomId, UUID callerId) {
+        Room room = roomRepository.findRoomById(roomId)
+                .orElseThrow(() -> new NoSuchElementException("Комната не найдена"));
+        if (!room.getPlayers().containsKey(callerId)) {
+            throw new PlayerNotInRoomException();
+        }
+        room.removePlayer(callerId);
+        return roomRepository.save(room);
     }
 
     private Room checkRoomOwner (UUID roomId, UUID callerId) {

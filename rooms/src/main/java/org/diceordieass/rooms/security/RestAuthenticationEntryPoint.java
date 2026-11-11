@@ -14,9 +14,6 @@ import tools.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
 
-
-//Нужен для кастомизации ответа пользователю при попытке попасть на защищенный ресурс без валидной аутентификации.
-//Нужен помимо ControllerAdvice т.к. не аутентифицированные запросы до DispatcherServlet/контроллера вообще не доходят
 @Component
 @RequiredArgsConstructor
 public class RestAuthenticationEntryPoint implements AuthenticationEntryPoint {

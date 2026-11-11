@@ -11,11 +11,6 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
-/*
- * В отличие от users.config.SecurityConfig, здесь нет бинов AuthenticationManager/
- * PasswordEncoder — :rooms не делает login и не сверяет пароли, он только проверяет
- * чужую подпись на уже готовом токене. Поэтому весь bean один — сама цепочка фильтров.
- */
 @Configuration
 @RequiredArgsConstructor
 public class SecurityConfig {

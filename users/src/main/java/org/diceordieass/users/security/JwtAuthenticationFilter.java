@@ -20,11 +20,10 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
-    private static final String BEARER_PREFIX = "Bearer ";//стандартный префикс HTTP-схемы авторизации для токенов
+    private static final String BEARER_PREFIX = "Bearer ";
 
     private final JwtService jwtService;
-    //конкретный класс, не интерфейс UserDetailsService: нужен именно loadUserById,
-    //которого в контракте UserDetailsService нет (там только поиск по username, это для /login)
+
     private final CustomUserDetailsService userDetailsService;
 
     @Override
@@ -33,24 +32,22 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         String authHeader = request.getHeader("Authorization");
 
-        if (authHeader == null ||  !authHeader.startsWith(BEARER_PREFIX)) { //Если заголовка нет или он не той схемы - это не ошибка.
-            // Фильтр просто пропускает запрос дальше по цепочке без попытки аутентифицировать, ничего не трогая в SecurityContextHolder
+        if (authHeader == null ||  !authHeader.startsWith(BEARER_PREFIX)) {
+
             filterChain.doFilter(request, response);
             return;
         }
 
-        String token = authHeader.substring(BEARER_PREFIX.length()); // отрезает сам префикс "Bearer ", оставляя только тело токена
+        String token = authHeader.substring(BEARER_PREFIX.length());
 
         try {
             UUID userId = jwtService.extractUserId(token);
             UserDetails userDetails = userDetailsService.loadUserById(userId);
-            //здесь — уже подтверждённый результат: трёхаргументный конструктор принимает principal (объект пользователя),
-            // credentials (null — пароль здесь незачем, мы уже всё проверили через подпись токена) и authorities (роли из UserDetails).
+
             UsernamePasswordAuthenticationToken authentication =
                     new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
             authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-            //вот то, ради которого всё затевалось: теперь для текущего запроса(и только текущего — SecurityContextHolder
-            // на потоке, не на сервере в целом) Spring Security считает пользователя аутентифицированным
+
             SecurityContextHolder.getContext().setAuthentication(authentication);
         } catch (JwtException | UsernameNotFoundException _) {
             SecurityContextHolder.clearContext();
